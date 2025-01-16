@@ -4,21 +4,24 @@
 import { parse } from '@wordpress/blocks';
 import deprecated from '@wordpress/deprecated';
 import { store as coreStore } from '@wordpress/core-data';
-import { store as interfaceStore } from '@wordpress/interface';
 import { store as blockEditorStore } from '@wordpress/block-editor';
-import { store as editorStore } from '@wordpress/editor';
+import {
+	store as editorStore,
+	privateApis as editorPrivateApis,
+} from '@wordpress/editor';
 import { store as preferencesStore } from '@wordpress/preferences';
 
 /**
  * Internal dependencies
  */
-import { STORE_NAME as editSiteStoreName } from './constants';
 import {
 	TEMPLATE_POST_TYPE,
 	TEMPLATE_PART_POST_TYPE,
 	NAVIGATION_POST_TYPE,
 } from '../utils/constants';
 import { unlock } from '../lock-unlock';
+
+const { interfaceStore } = unlock( editorPrivateApis );
 
 /**
  * Dispatches an action that toggles a feature flag.
@@ -139,11 +142,16 @@ export const removeTemplate =
 /**
  * Action that sets a template part.
  *
+ * @deprecated
  * @param {string} templatePartId The template part ID.
  *
  * @return {Object} Action object.
  */
 export function setTemplatePart( templatePartId ) {
+	deprecated( "dispatch( 'core/edit-site' ).setTemplatePart", {
+		since: '6.8',
+	} );
+
 	return {
 		type: 'SET_EDITED_POST',
 		postType: TEMPLATE_PART_POST_TYPE,
@@ -154,11 +162,16 @@ export function setTemplatePart( templatePartId ) {
 /**
  * Action that sets a navigation menu.
  *
+ * @deprecated
  * @param {string} navigationMenuId The Navigation Menu Post ID.
  *
  * @return {Object} Action object.
  */
 export function setNavigationMenu( navigationMenuId ) {
+	deprecated( "dispatch( 'core/edit-site' ).setNavigationMenu", {
+		since: '6.8',
+	} );
+
 	return {
 		type: 'SET_EDITED_POST',
 		postType: NAVIGATION_POST_TYPE,
@@ -169,6 +182,7 @@ export function setNavigationMenu( navigationMenuId ) {
 /**
  * Action that sets an edited entity.
  *
+ * @deprecated
  * @param {string} postType The entity's post type.
  * @param {string} postId   The entity's ID.
  * @param {Object} context  The entity's context.
@@ -201,11 +215,15 @@ export function setHomeTemplateId() {
 /**
  * Set's the current block editor context.
  *
+ * @deprecated
  * @param {Object} context The context object.
  *
  * @return {Object} Action object.
  */
 export function setEditedPostContext( context ) {
+	deprecated( "dispatch( 'core/edit-site' ).setEditedPostContext", {
+		since: '6.8',
+	} );
 	return {
 		type: 'SET_EDITED_POST_CONTEXT',
 		context,
@@ -218,7 +236,7 @@ export function setEditedPostContext( context ) {
  *
  * @deprecated
  *
- * @return {number} The resolved template ID for the page route.
+ * @return {Object} Action object.
  */
 export function setPage() {
 	deprecated( "dispatch( 'core/edit-site' ).setPage", {
@@ -362,7 +380,7 @@ export const openGeneralSidebar =
 	( { registry } ) => {
 		registry
 			.dispatch( interfaceStore )
-			.enableComplementaryArea( editSiteStoreName, name );
+			.enableComplementaryArea( 'core', name );
 	};
 
 /**
@@ -371,9 +389,7 @@ export const openGeneralSidebar =
 export const closeGeneralSidebar =
 	() =>
 	( { registry } ) => {
-		registry
-			.dispatch( interfaceStore )
-			.disableComplementaryArea( editSiteStoreName );
+		registry.dispatch( interfaceStore ).disableComplementaryArea( 'core' );
 	};
 
 /**
