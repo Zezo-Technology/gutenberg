@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import classnames from 'classnames';
+import clsx from 'clsx';
 
 /**
  * WordPress dependencies
@@ -11,8 +11,8 @@ import { addFilter } from '@wordpress/hooks';
 import { getBlockSupport, hasBlockSupport } from '@wordpress/blocks';
 import { useSelect } from '@wordpress/data';
 import {
-	Button,
-	ButtonGroup,
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 	ToggleControl,
 	PanelBody,
 	privateApis as componentsPrivateApis,
@@ -32,6 +32,7 @@ import { useBlockSettings, useStyleOverride } from './utils';
 import { unlock } from '../lock-unlock';
 
 const layoutBlockSupportKey = 'layout';
+const { kebabCase } = unlock( componentsPrivateApis );
 
 function hasLayoutBlockSupport( blockName ) {
 	return (
@@ -49,7 +50,6 @@ function hasLayoutBlockSupport( blockName ) {
  * @return { Array } Array of CSS classname strings.
  */
 export function useLayoutClasses( blockAttributes = {}, blockName = '' ) {
-	const { kebabCase } = unlock( componentsPrivateApis );
 	const { layout } = blockAttributes;
 	const { default: defaultBlockLayout } =
 		getBlockSupport( blockName, layoutBlockSupportKey ) || {};
@@ -233,7 +233,6 @@ function LayoutPanelPure( {
 						<>
 							<ToggleControl
 								__nextHasNoMarginBottom
-								className="block-editor-hooks__toggle-control"
 								label={ __( 'Inner blocks use content width' ) }
 								checked={
 									layoutType?.name === 'constrained' ||
@@ -258,7 +257,7 @@ function LayoutPanelPure( {
 												'Nested blocks use content width with options for full and wide widths.'
 										  )
 										: __(
-												'Nested blocks will fill the width of this container. Toggle to constrain.'
+												'Nested blocks will fill the width of this container.'
 										  )
 								}
 							/>
@@ -316,19 +315,26 @@ export default {
 
 function LayoutTypeSwitcher( { type, onChange } ) {
 	return (
-		<ButtonGroup>
+		<ToggleGroupControl
+			__next40pxDefaultSize
+			isBlock
+			label={ __( 'Layout type' ) }
+			__nextHasNoMarginBottom
+			hideLabelFromVision
+			isAdaptiveWidth
+			value={ type }
+			onChange={ onChange }
+		>
 			{ getLayoutTypes().map( ( { name, label } ) => {
 				return (
-					<Button
+					<ToggleGroupControlOption
 						key={ name }
-						isPressed={ type === name }
-						onClick={ () => onChange( name ) }
-					>
-						{ label }
-					</Button>
+						value={ name }
+						label={ label }
+					/>
 				);
 			} ) }
-		</ButtonGroup>
+		</ToggleGroupControl>
 	);
 }
 
@@ -371,10 +377,9 @@ function BlockWithLayoutStyles( {
 			? { ...layout, type: 'constrained' }
 			: layout || defaultBlockLayout || {};
 
-	const { kebabCase } = unlock( componentsPrivateApis );
 	const selectorPrefix = `wp-container-${ kebabCase( name ) }-is-layout-`;
 	// Higher specificity to override defaults from theme.json.
-	const selector = `.${ selectorPrefix }${ id }.${ selectorPrefix }${ id }`;
+	const selector = `.${ selectorPrefix }${ id }`;
 	const hasBlockGapSupport = blockGapSupport !== null;
 
 	// Get CSS string for the current layout type.
@@ -389,7 +394,7 @@ function BlockWithLayoutStyles( {
 	} );
 
 	// Attach a `wp-container-` id-based class name as well as a layout class name such as `is-layout-flex`.
-	const layoutClassNames = classnames(
+	const layoutClassNames = clsx(
 		{
 			[ `${ selectorPrefix }${ id }` ]: !! css, // Only attach a container class if there is generated CSS to be attached.
 		},

@@ -162,7 +162,10 @@ test.describe( 'List View', () => {
 		// make the inner blocks appear.
 		await editor.canvas
 			.getByRole( 'document', { name: 'Block: Cover' } )
-			.getByRole( 'option', { name: /Color: /i } )
+			.getByRole( 'group', {
+				name: 'Overlay color',
+			} )
+			.getByRole( 'button' )
 			.first()
 			.click();
 
@@ -809,8 +812,8 @@ test.describe( 'List View', () => {
 
 		// Delete remaining blocks.
 		// Keyboard shortcut should also work.
-		await pageUtils.pressKeys( 'access+z' );
-		await pageUtils.pressKeys( 'access+z' );
+		await pageUtils.pressKeys( 'primaryShift+Backspace' );
+		await pageUtils.pressKeys( 'primaryShift+Backspace' );
 		await expect
 			.poll(
 				listViewUtils.getBlocksWithA11yAttributes,
@@ -842,7 +845,7 @@ test.describe( 'List View', () => {
 				{ name: 'core/heading', selected: false },
 			] );
 
-		await pageUtils.pressKeys( 'access+z' );
+		await pageUtils.pressKeys( 'primaryShift+Backspace' );
 		await expect
 			.poll(
 				listViewUtils.getBlocksWithA11yAttributes,
@@ -865,7 +868,11 @@ test.describe( 'List View', () => {
 			.getByRole( 'gridcell', { name: 'File' } )
 			.getByRole( 'link' )
 			.focus();
-		for ( const keys of [ 'Delete', 'Backspace', 'access+z' ] ) {
+		for ( const keys of [
+			'Delete',
+			'Backspace',
+			'primaryShift+Backspace',
+		] ) {
 			await pageUtils.pressKeys( keys );
 			await expect
 				.poll(
@@ -986,6 +993,45 @@ test.describe( 'List View', () => {
 			] );
 	} );
 
+	test( 'should create a group block from the selected multiple blocks', async ( {
+		editor,
+		pageUtils,
+		listViewUtils,
+	} ) => {
+		// Insert some blocks of different types.
+		await editor.insertBlock( { name: 'core/paragraph' } );
+		await editor.insertBlock( { name: 'core/heading' } );
+		await editor.insertBlock( { name: 'core/file' } );
+
+		await listViewUtils.openListView();
+
+		// Group Heading and File blocks.
+		await pageUtils.pressKeys( 'shift+ArrowUp' );
+		await pageUtils.pressKeys( 'primary+g' );
+		await expect
+			.poll( listViewUtils.getBlocksWithA11yAttributes )
+			.toMatchObject( [
+				{ name: 'core/paragraph', selected: false, focused: false },
+				{
+					name: 'core/group',
+					selected: true,
+					focused: true,
+					innerBlocks: [
+						{
+							name: 'core/heading',
+							selected: false,
+							focused: false,
+						},
+						{
+							name: 'core/file',
+							selected: false,
+							focused: false,
+						},
+					],
+				},
+			] );
+	} );
+
 	test( 'block settings dropdown menu', async ( {
 		editor,
 		page,
@@ -1081,7 +1127,7 @@ test.describe( 'List View', () => {
 				'Pressing keyboard shortcut should also work when the menu is opened and focused'
 			)
 			.toMatchObject( [
-				{ name: 'core/paragraph', selected: true, focused: false },
+				{ name: 'core/paragraph', selected: true, focused: true },
 				{ name: 'core/file', selected: false, focused: false },
 			] );
 		await expect(
@@ -1094,7 +1140,7 @@ test.describe( 'List View', () => {
 			optionsForFileMenu,
 			'Pressing Space should also open the menu dropdown'
 		).toBeVisible();
-		await pageUtils.pressKeys( 'access+z' ); // Keyboard shortcut for Delete.
+		await pageUtils.pressKeys( 'primaryShift+Backspace' ); // Keyboard shortcut for Delete.
 		await expect
 			.poll(
 				listViewUtils.getBlocksWithA11yAttributes,
@@ -1114,7 +1160,7 @@ test.describe( 'List View', () => {
 			optionsForFileMenu.getByRole( 'menuitem', { name: 'Delete' } ),
 			'The delete menu item should be hidden for locked blocks'
 		).toBeHidden();
-		await pageUtils.pressKeys( 'access+z' );
+		await pageUtils.pressKeys( 'primaryShift+Backspace' );
 		await expect
 			.poll(
 				listViewUtils.getBlocksWithA11yAttributes,

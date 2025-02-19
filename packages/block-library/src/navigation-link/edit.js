@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import classnames from 'classnames';
+import clsx from 'clsx';
 
 /**
  * WordPress dependencies
@@ -9,11 +9,11 @@ import classnames from 'classnames';
 import { createBlock } from '@wordpress/blocks';
 import { useSelect, useDispatch } from '@wordpress/data';
 import {
-	PanelBody,
+	__experimentalToolsPanel as ToolsPanel,
+	__experimentalToolsPanelItem as ToolsPanelItem,
 	TextControl,
 	TextareaControl,
 	ToolbarButton,
-	Tooltip,
 	ToolbarGroup,
 } from '@wordpress/components';
 import { displayShortcut, isKeyboardEvent } from '@wordpress/keycodes';
@@ -153,6 +153,121 @@ function getMissingText( type ) {
 	return missingText;
 }
 
+/*
+ * Warning, this duplicated in
+ * packages/block-library/src/navigation-submenu/edit.js
+ * Consider reusing this components for both blocks.
+ */
+function Controls( { attributes, setAttributes, setIsLabelFieldFocused } ) {
+	const { label, url, description, title, rel } = attributes;
+	return (
+		<ToolsPanel label={ __( 'Settings' ) }>
+			<ToolsPanelItem
+				hasValue={ () => !! label }
+				label={ __( 'Text' ) }
+				onDeselect={ () => setAttributes( { label: '' } ) }
+				isShownByDefault
+			>
+				<TextControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Text' ) }
+					value={ label ? stripHTML( label ) : '' }
+					onChange={ ( labelValue ) => {
+						setAttributes( { label: labelValue } );
+					} }
+					autoComplete="off"
+					onFocus={ () => setIsLabelFieldFocused( true ) }
+					onBlur={ () => setIsLabelFieldFocused( false ) }
+				/>
+			</ToolsPanelItem>
+
+			<ToolsPanelItem
+				hasValue={ () => !! url }
+				label={ __( 'Link' ) }
+				onDeselect={ () => setAttributes( { url: '' } ) }
+				isShownByDefault
+			>
+				<TextControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Link' ) }
+					value={ url ? safeDecodeURI( url ) : '' }
+					onChange={ ( urlValue ) => {
+						updateAttributes(
+							{ url: urlValue },
+							setAttributes,
+							attributes
+						);
+					} }
+					autoComplete="off"
+				/>
+			</ToolsPanelItem>
+
+			<ToolsPanelItem
+				hasValue={ () => !! description }
+				label={ __( 'Description' ) }
+				onDeselect={ () => setAttributes( { description: '' } ) }
+				isShownByDefault
+			>
+				<TextareaControl
+					__nextHasNoMarginBottom
+					label={ __( 'Description' ) }
+					value={ description || '' }
+					onChange={ ( descriptionValue ) => {
+						setAttributes( { description: descriptionValue } );
+					} }
+					help={ __(
+						'The description will be displayed in the menu if the current theme supports it.'
+					) }
+				/>
+			</ToolsPanelItem>
+
+			<ToolsPanelItem
+				hasValue={ () => !! title }
+				label={ __( 'Title attribute' ) }
+				onDeselect={ () => setAttributes( { title: '' } ) }
+				isShownByDefault
+			>
+				<TextControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Title attribute' ) }
+					value={ title || '' }
+					onChange={ ( titleValue ) => {
+						setAttributes( { title: titleValue } );
+					} }
+					autoComplete="off"
+					help={ __(
+						'Additional information to help clarify the purpose of the link.'
+					) }
+				/>
+			</ToolsPanelItem>
+
+			<ToolsPanelItem
+				hasValue={ () => !! rel }
+				label={ __( 'Rel attribute' ) }
+				onDeselect={ () => setAttributes( { rel: '' } ) }
+				isShownByDefault
+			>
+				<TextControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Rel attribute' ) }
+					value={ rel || '' }
+					onChange={ ( relValue ) => {
+						setAttributes( { rel: relValue } );
+					} }
+					autoComplete="off"
+					help={ __(
+						'The relationship of the linked URL as space-separated link types.'
+					) }
+				/>
+			</ToolsPanelItem>
+		</ToolsPanel>
+	);
+}
+
 export default function NavigationLinkEdit( {
 	attributes,
 	isSelected,
@@ -163,7 +278,7 @@ export default function NavigationLinkEdit( {
 	context,
 	clientId,
 } ) {
-	const { id, label, type, url, description, rel, title, kind } = attributes;
+	const { id, label, type, url, description, kind } = attributes;
 
 	const [ isInvalid, isDraft ] = useIsInvalidLink( kind, type, id );
 	const { maxNestingLevel } = context;
@@ -171,9 +286,11 @@ export default function NavigationLinkEdit( {
 	const {
 		replaceBlock,
 		__unstableMarkNextChangeAsNotPersistent,
+		selectBlock,
 		selectPreviousBlock,
 	} = useDispatch( blockEditorStore );
-	const [ isLinkOpen, setIsLinkOpen ] = useState( false );
+	// Have the link editing ui open on mount when lacking a url and selected.
+	const [ isLinkOpen, setIsLinkOpen ] = useState( isSelected && ! url );
 	// Store what element opened the popover, so we know where to return focus to (toolbar button vs navigation link text)
 	const [ openedBy, setOpenedBy ] = useState( null );
 	// Use internal state instead of a ref to make sure that the component
@@ -183,6 +300,7 @@ export default function NavigationLinkEdit( {
 	const isDraggingWithin = useIsDraggingWithin( listItemRef );
 	const itemLabelPlaceholder = __( 'Add label…' );
 	const ref = useRef();
+	const linkUIref = useRef();
 	const prevUrl = usePrevious( url );
 
 	// Change the label using inspector causes rich text to change focus on firefox.
@@ -228,26 +346,18 @@ export default function NavigationLinkEdit( {
 	 * Transform to submenu block.
 	 */
 	const transformToSubmenu = () => {
-		const innerBlocks = getBlocks( clientId );
+		let innerBlocks = getBlocks( clientId );
+		if ( innerBlocks.length === 0 ) {
+			innerBlocks = [ createBlock( 'core/navigation-link' ) ];
+			selectBlock( innerBlocks[ 0 ].clientId );
+		}
 		const newSubmenu = createBlock(
 			'core/navigation-submenu',
 			attributes,
-			innerBlocks.length > 0
-				? innerBlocks
-				: [ createBlock( 'core/navigation-link' ) ]
+			innerBlocks
 		);
 		replaceBlock( clientId, newSubmenu );
 	};
-
-	useEffect( () => {
-		// Show the LinkControl on mount if the URL is empty
-		// ( When adding a new menu item)
-		// This can't be done in the useState call because it conflicts
-		// with the autofocus behavior of the BlockListBlock component.
-		if ( ! url ) {
-			setIsLinkOpen( true );
-		}
-	}, [ url ] );
 
 	useEffect( () => {
 		// If block has inner blocks, transform to Submenu.
@@ -258,16 +368,6 @@ export default function NavigationLinkEdit( {
 			transformToSubmenu();
 		}
 	}, [ hasChildren ] );
-
-	/**
-	 * The hook shouldn't be necessary but due to a focus loss happening
-	 * when selecting a suggestion in the link popover, we force close on block unselection.
-	 */
-	useEffect( () => {
-		if ( ! isSelected ) {
-			setIsLinkOpen( false );
-		}
-	}, [ isSelected ] );
 
 	// If the LinkControl popover is open and the URL has changed, close the LinkControl and focus the label text.
 	useEffect( () => {
@@ -343,7 +443,7 @@ export default function NavigationLinkEdit( {
 
 	const blockProps = useBlockProps( {
 		ref: useMergeRefs( [ setPopoverAnchor, listItemRef ] ),
-		className: classnames( 'wp-block-navigation-item', {
+		className: clsx( 'wp-block-navigation-item', {
 			'is-editing': isSelected || isParentOfSelectedBlock,
 			'is-dragging-within': isDraggingWithin,
 			'has-link': !! url,
@@ -380,7 +480,7 @@ export default function NavigationLinkEdit( {
 		};
 	}
 
-	const classes = classnames( 'wp-block-navigation-item__content', {
+	const classes = clsx( 'wp-block-navigation-item__content', {
 		'wp-block-navigation-link__placeholder': ! url || isInvalid || isDraft,
 	} );
 
@@ -389,10 +489,6 @@ export default function NavigationLinkEdit( {
 	const placeholderText = `(${
 		isInvalid ? __( 'Invalid' ) : __( 'Draft' )
 	})`;
-	const tooltipText =
-		isInvalid || isDraft
-			? __( 'This item has been deleted, or is a draft' )
-			: __( 'This item is missing a link' );
 
 	return (
 		<>
@@ -420,71 +516,11 @@ export default function NavigationLinkEdit( {
 			</BlockControls>
 			{ /* Warning, this duplicated in packages/block-library/src/navigation-submenu/edit.js */ }
 			<InspectorControls>
-				<PanelBody title={ __( 'Settings' ) }>
-					<TextControl
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-						value={ label ? stripHTML( label ) : '' }
-						onChange={ ( labelValue ) => {
-							setAttributes( { label: labelValue } );
-						} }
-						label={ __( 'Text' ) }
-						autoComplete="off"
-						onFocus={ () => setIsLabelFieldFocused( true ) }
-						onBlur={ () => setIsLabelFieldFocused( false ) }
-					/>
-					<TextControl
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-						value={ url ? safeDecodeURI( url ) : '' }
-						onChange={ ( urlValue ) => {
-							updateAttributes(
-								{ url: urlValue },
-								setAttributes,
-								attributes
-							);
-						} }
-						label={ __( 'Link' ) }
-						autoComplete="off"
-					/>
-					<TextareaControl
-						__nextHasNoMarginBottom
-						value={ description || '' }
-						onChange={ ( descriptionValue ) => {
-							setAttributes( { description: descriptionValue } );
-						} }
-						label={ __( 'Description' ) }
-						help={ __(
-							'The description will be displayed in the menu if the current theme supports it.'
-						) }
-					/>
-					<TextControl
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-						value={ title || '' }
-						onChange={ ( titleValue ) => {
-							setAttributes( { title: titleValue } );
-						} }
-						label={ __( 'Title attribute' ) }
-						autoComplete="off"
-						help={ __(
-							'Additional information to help clarify the purpose of the link.'
-						) }
-					/>
-					<TextControl
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-						value={ rel || '' }
-						onChange={ ( relValue ) => {
-							setAttributes( { rel: relValue } );
-						} }
-						label={ __( 'Rel attribute' ) }
-						autoComplete="off"
-						help={ __(
-							'The relationship of the linked URL as space-separated link types.'
-						) }
-					/>
-				</PanelBody>
+				<Controls
+					attributes={ attributes }
+					setAttributes={ setAttributes }
+					setIsLabelFieldFocused={ setIsLabelFieldFocused }
+				/>
 			</InspectorControls>
 			<div { ...blockProps }>
 				{ /* eslint-disable jsx-a11y/anchor-is-valid */ }
@@ -492,9 +528,7 @@ export default function NavigationLinkEdit( {
 					{ /* eslint-enable */ }
 					{ ! url ? (
 						<div className="wp-block-navigation-link__placeholder-text">
-							<Tooltip text={ tooltipText }>
-								<span>{ missingText }</span>
-							</Tooltip>
+							<span>{ missingText }</span>
 						</div>
 					) : (
 						<>
@@ -526,12 +560,6 @@ export default function NavigationLinkEdit( {
 											) }
 											placeholder={ itemLabelPlaceholder }
 											withoutInteractiveFormatting
-											allowedFormats={ [
-												'core/bold',
-												'core/italic',
-												'core/image',
-												'core/strikethrough',
-											] }
 										/>
 										{ description && (
 											<span className="wp-block-navigation-item__description">
@@ -543,41 +571,57 @@ export default function NavigationLinkEdit( {
 							{ ( isInvalid ||
 								isDraft ||
 								isLabelFieldFocused ) && (
-								<div className="wp-block-navigation-link__placeholder-text wp-block-navigation-link__label">
-									<Tooltip text={ tooltipText }>
-										<span
-											aria-label={ __(
-												'Navigation link text'
-											) }
-										>
-											{
-												// Some attributes are stored in an escaped form. It's a legacy issue.
-												// Ideally they would be stored in a raw, unescaped form.
-												// Unescape is used here to "recover" the escaped characters
-												// so they display without encoding.
-												// See `updateAttributes` for more details.
-												`${ decodeEntities( label ) } ${
-													isInvalid || isDraft
-														? placeholderText
-														: ''
-												}`.trim()
-											}
-										</span>
-									</Tooltip>
+								<div
+									className={ clsx(
+										'wp-block-navigation-link__placeholder-text',
+										'wp-block-navigation-link__label',
+										{
+											'is-invalid': isInvalid,
+											'is-draft': isDraft,
+										}
+									) }
+								>
+									<span>
+										{
+											// Some attributes are stored in an escaped form. It's a legacy issue.
+											// Ideally they would be stored in a raw, unescaped form.
+											// Unescape is used here to "recover" the escaped characters
+											// so they display without encoding.
+											// See `updateAttributes` for more details.
+											`${ decodeEntities( label ) } ${
+												isInvalid || isDraft
+													? placeholderText
+													: ''
+											}`.trim()
+										}
+									</span>
 								</div>
 							) }
 						</>
 					) }
 					{ isLinkOpen && (
 						<LinkUI
+							ref={ linkUIref }
 							clientId={ clientId }
 							link={ attributes }
 							onClose={ () => {
 								// If there is no link then remove the auto-inserted block.
 								// This avoids empty blocks which can provided a poor UX.
 								if ( ! url ) {
-									// Select the previous block to keep focus nearby
-									selectPreviousBlock( clientId, true );
+									// Fixes https://github.com/WordPress/gutenberg/issues/61361
+									// There's a chance we're closing due to the user selecting the browse all button.
+									// Only move focus if the focus is still within the popover ui. If it's not within
+									// the popover, it's because something has taken the focus from the popover, and
+									// we don't want to steal it back.
+									if (
+										linkUIref.current.contains(
+											window.document.activeElement
+										)
+									) {
+										// Select the previous block to keep focus nearby
+										selectPreviousBlock( clientId, true );
+									}
+
 									// Remove the link.
 									onReplace( [] );
 									return;

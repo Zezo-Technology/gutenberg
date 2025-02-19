@@ -4,10 +4,17 @@
 import { useSelect, useDispatch } from '@wordpress/data';
 import { decodeEntities } from '@wordpress/html-entities';
 import { DropdownMenu, MenuGroup, MenuItem } from '@wordpress/components';
+import { useState, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { useEntityRecord } from '@wordpress/core-data';
+import { useEntityRecord, store as coreStore } from '@wordpress/core-data';
 import { check } from '@wordpress/icons';
 import { store as noticesStore } from '@wordpress/notices';
+import { store as preferencesStore } from '@wordpress/preferences';
+
+/**
+ * Internal dependencies
+ */
+import PostPanelRow from '../post-panel-row';
 
 /**
  * Internal dependencies
@@ -17,11 +24,6 @@ import SwapTemplateButton from './swap-template-button';
 import ResetDefaultTemplate from './reset-default-template';
 import { unlock } from '../../lock-unlock';
 import CreateNewTemplate from './create-new-template';
-
-const POPOVER_PROPS = {
-	className: 'editor-post-template__dropdown',
-	placement: 'bottom-start',
-};
 
 export default function BlockThemeControl( { id } ) {
 	const {
@@ -43,6 +45,8 @@ export default function BlockThemeControl( { id } ) {
 		};
 	}, [] );
 
+	const { get: getPreference } = useSelect( preferencesStore );
+
 	const { editedRecord: template, hasResolved } = useEntityRecord(
 		'postType',
 		'wp_template',
@@ -50,6 +54,30 @@ export default function BlockThemeControl( { id } ) {
 	);
 	const { createSuccessNotice } = useDispatch( noticesStore );
 	const { setRenderingMode } = useDispatch( editorStore );
+
+	const canCreateTemplate = useSelect(
+		( select ) =>
+			!! select( coreStore ).canUser( 'create', {
+				kind: 'postType',
+				name: 'wp_template',
+			} ),
+		[]
+	);
+
+	const [ popoverAnchor, setPopoverAnchor ] = useState( null );
+	// Memoize popoverProps to avoid returning a new object every time.
+	const popoverProps = useMemo(
+		() => ( {
+			// Anchor the popover to the middle of the entire row so that it doesn't
+			// move around when the label changes.
+			anchor: popoverAnchor,
+			className: 'editor-post-template__dropdown',
+			placement: 'left-start',
+			offset: 36,
+			shift: true,
+		} ),
+		[ popoverAnchor ]
+	);
 
 	if ( ! hasResolved ) {
 		return null;
@@ -66,64 +94,74 @@ export default function BlockThemeControl( { id } ) {
 				},
 		  ]
 		: undefined;
-	return (
-		<DropdownMenu
-			popoverProps={ POPOVER_PROPS }
-			focusOnMount
-			toggleProps={ {
-				__next40pxDefaultSize: true,
-				variant: 'tertiary',
-			} }
-			label={ __( 'Template options' ) }
-			text={ decodeEntities( template.title ) }
-			icon={ null }
-		>
-			{ ( { onClose } ) => (
-				<>
-					<MenuGroup>
-						<MenuItem
-							onClick={ () => {
-								onNavigateToEntityRecord( {
-									postId: template.id,
-									postType: 'wp_template',
-								} );
-								onClose();
-								createSuccessNotice(
-									__(
-										'Editing template. Changes made here affect all posts and pages that use the template.'
-									),
-									{
-										type: 'snackbar',
-										actions: notificationAction,
-									}
-								);
-							} }
-						>
-							{ __( 'Edit template' ) }
-						</MenuItem>
 
-						<SwapTemplateButton onClick={ onClose } />
-						<ResetDefaultTemplate onClick={ onClose } />
-						<CreateNewTemplate onClick={ onClose } />
-					</MenuGroup>
-					<MenuGroup>
-						<MenuItem
-							icon={ ! isTemplateHidden ? check : undefined }
-							isSelected={ ! isTemplateHidden }
-							role="menuitemcheckbox"
-							onClick={ () => {
-								setRenderingMode(
-									isTemplateHidden
-										? 'template-locked'
-										: 'post-only'
-								);
-							} }
-						>
-							{ __( 'Template preview' ) }
-						</MenuItem>
-					</MenuGroup>
-				</>
-			) }
-		</DropdownMenu>
+	const mayShowTemplateEditNotice = () => {
+		if ( ! getPreference( 'core/edit-site', 'welcomeGuideTemplate' ) ) {
+			createSuccessNotice(
+				__(
+					'Editing template. Changes made here affect all posts and pages that use the template.'
+				),
+				{ type: 'snackbar', actions: notificationAction }
+			);
+		}
+	};
+	return (
+		<PostPanelRow label={ __( 'Template' ) } ref={ setPopoverAnchor }>
+			<DropdownMenu
+				popoverProps={ popoverProps }
+				focusOnMount
+				toggleProps={ {
+					size: 'compact',
+					variant: 'tertiary',
+					tooltipPosition: 'middle left',
+				} }
+				label={ __( 'Template options' ) }
+				text={ decodeEntities( template.title ) }
+				icon={ null }
+			>
+				{ ( { onClose } ) => (
+					<>
+						<MenuGroup>
+							{ canCreateTemplate && (
+								<MenuItem
+									onClick={ () => {
+										onNavigateToEntityRecord( {
+											postId: template.id,
+											postType: 'wp_template',
+										} );
+										onClose();
+										mayShowTemplateEditNotice();
+									} }
+								>
+									{ __( 'Edit template' ) }
+								</MenuItem>
+							) }
+
+							<SwapTemplateButton onClick={ onClose } />
+							<ResetDefaultTemplate onClick={ onClose } />
+							{ canCreateTemplate && (
+								<CreateNewTemplate onClick={ onClose } />
+							) }
+						</MenuGroup>
+						<MenuGroup>
+							<MenuItem
+								icon={ ! isTemplateHidden ? check : undefined }
+								isSelected={ ! isTemplateHidden }
+								role="menuitemcheckbox"
+								onClick={ () => {
+									setRenderingMode(
+										isTemplateHidden
+											? 'template-locked'
+											: 'post-only'
+									);
+								} }
+							>
+								{ __( 'Show template' ) }
+							</MenuItem>
+						</MenuGroup>
+					</>
+				) }
+			</DropdownMenu>
+		</PostPanelRow>
 	);
 }

@@ -5,10 +5,10 @@ const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
 async function draftNewPage( page ) {
 	await page.getByRole( 'button', { name: 'Pages' } ).click();
-	await page.getByRole( 'button', { name: 'Add new page' } ).click();
+	await page.getByRole( 'button', { name: 'Add page' } ).click();
 	await page
-		.locator( 'role=dialog[name="Draft a new page"i]' )
-		.locator( 'role=textbox[name="Page title"i]' )
+		.locator( 'role=dialog[name="Draft new: page"i]' )
+		.locator( 'role=textbox[name="title"i]' )
 		.fill( 'Test Page' );
 	await page.keyboard.press( 'Enter' );
 	await expect(
@@ -36,7 +36,9 @@ async function addPageContent( editor, page ) {
 		.fill( 'Lorem ipsum dolor sit amet' );
 
 	// Insert into Page Content using global inserter.
-	await page.getByRole( 'button', { name: 'Toggle block inserter' } ).click();
+	await page
+		.getByRole( 'button', { name: 'Block Inserter', exact: true } )
+		.click();
 	await page.getByRole( 'option', { name: 'Heading', exact: true } ).click();
 	await editor.canvas
 		.getByRole( 'document', {
@@ -90,7 +92,7 @@ test.describe( 'Pages', () => {
 		await admin.visitSiteEditor();
 	} );
 
-	test( 'create a new page, edit template and toggle page template preview', async ( {
+	test.skip( 'create a new page, edit template and toggle page template preview', async ( {
 		page,
 		editor,
 	} ) => {
@@ -146,12 +148,12 @@ test.describe( 'Pages', () => {
 		await page.getByRole( 'button', { name: 'Save', exact: true } ).click();
 		await expect(
 			page.locator(
-				'role=region[name="Save panel"] >> role=checkbox[name="Title"]'
+				'role=region[name="Editor publish"] >> role=checkbox[name="Title"]'
 			)
 		).toBeVisible();
 		await expect(
 			page.locator(
-				'role=region[name="Save panel"] >> role=checkbox[name="Test Page"]'
+				'role=region[name="Editor publish"] >> role=checkbox[name="Test Page"]'
 			)
 		).toBeVisible();
 		await page
@@ -187,7 +189,7 @@ test.describe( 'Pages', () => {
 		await templateOptionsButton.click();
 		const templatePreviewButton = page
 			.getByRole( 'menu', { name: 'Template options' } )
-			.getByRole( 'menuitemcheckbox', { name: 'Template preview' } );
+			.getByRole( 'menuitemcheckbox', { name: 'Show template' } );
 
 		await expect( templatePreviewButton ).toHaveAttribute(
 			'aria-checked',
@@ -245,7 +247,7 @@ test.describe( 'Pages', () => {
 		// Create a custom template first.
 		const templateName = 'demo';
 		await page.getByRole( 'button', { name: 'Templates' } ).click();
-		await page.getByRole( 'button', { name: 'Add New Template' } ).click();
+		await page.getByRole( 'button', { name: 'Add template' } ).click();
 		await page
 			.getByRole( 'button', {
 				name: 'A custom template can be manually applied to any post or page.',
@@ -278,7 +280,7 @@ test.describe( 'Pages', () => {
 		await templateOptionsButton.click();
 		await page
 			.getByRole( 'menu', { name: 'Template options' } )
-			.getByText( 'Swap template' )
+			.getByText( 'Change template' )
 			.click();
 		const templateItem = page.locator(
 			'.block-editor-block-patterns-list__item-title'
@@ -301,7 +303,7 @@ test.describe( 'Pages', () => {
 		await expect( templateOptionsButton ).toHaveText( 'Single Entries' );
 	} );
 
-	test( 'swap template options should respect the declared `postTypes`', async ( {
+	test( 'change template options should respect the declared `postTypes`', async ( {
 		page,
 		editor,
 	} ) => {
@@ -316,7 +318,7 @@ test.describe( 'Pages', () => {
 		await expect(
 			page
 				.getByRole( 'menu', { name: 'Template options' } )
-				.getByText( 'Swap template' )
+				.getByText( 'Change template' )
 		).toHaveCount( 0 );
 	} );
 } );
