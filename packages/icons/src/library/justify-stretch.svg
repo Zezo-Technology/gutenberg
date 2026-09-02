@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="fill: none" stroke="currentColor" stroke-width="1.5">
-	<path d="M4.75 4V20M19.25 20V4" vector-effect="non-scaling-stroke" />
-	<rect x="7" y="10" width="10" height="4" fill="currentColor" stroke="none" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" style="fill:none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4.75 4V20M19.25 20V4" vector-effect="non-scaling-stroke"/><rect width="10" height="4" x="7" y="10" fill="currentColor" stroke="none"/></svg>
